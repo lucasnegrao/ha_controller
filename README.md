@@ -221,7 +221,7 @@ You can still use other relays for actual relays (e.g., controlling power), just
 | `backend`      | Yes      | Either `esphome` or `tasmota`                                               |
 | `device`       | Yes\*    | ESPHome device name (required for ESPHome backend)                          |
 | `mqtt_topic`   | Yes\*    | MQTT topic for Tasmota device (required for Tasmota backend)                |
-| `led_entity_id`| No       | Optional LED entity to indicate remote status (for learning indicator)      |
+| `led_entity_id`| No       | Optional LED entity to indicate remote status (for Tasmota learning indicator)      |
 
 \* Only one of `device` or `mqtt_topic` is required, depending on the backend.
 
@@ -337,3 +337,4 @@ data:
 ## Questions?
 
 Open an issue on [GitHub issue tracker](https://github.com/omaramin-2000/HA_universal_remote/issues) or ask in the [Home Assistant Community](https://community.home-assistant.io/)
+
