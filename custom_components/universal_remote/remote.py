@@ -41,7 +41,8 @@ SUPPORT_UNIVERSAL_REMOTE = 1  # LEARN_COMMAND | SEND_COMMAND
 PLATFORM_SCHEMA = PLATFORM_SCHEMA.extend(
     {
         vol.Required(CONF_NAME): cv.string,
-        vol.Required(CONF_DEVICE): cv.string,
+        vol.Required(CONF_DEVICE): cv.string
+    }
 )
 
 LEARNING_TIMEOUT = timedelta(seconds=60)
