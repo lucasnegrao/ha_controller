@@ -19,14 +19,12 @@ from homeassistant.components.remote import (
     PLATFORM_SCHEMA,
 )
 
-from homeassistant.const import CONF_NAME
-from homeassistant.const import ATTR_COMMAND, STATE_OFF
+from homeassistant.const import CONF_NAME, ATTR_COMMAND, STATE_OFF, Platform
 import homeassistant.helpers.config_validation as cv
 from homeassistant.helpers.storage import Store
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 from homeassistant.helpers.restore_state import RestoreEntity
-from homeassistant.helpers.storage import Store
 from homeassistant.util import dt as dt_util
 from homeassistant.core import callback
 from homeassistant.components.mqtt import async_subscribe
@@ -122,6 +120,7 @@ class UniversalRemote(RemoteEntity):
         )
         store_filename = f"universal_remote_LEARNED_codes_{device or mqtt_topic}.json"
         self._store = Store(hass, 1, store_filename)
+        self._button_entities = {}
 
     @property
     def available(self):
@@ -135,7 +134,7 @@ class UniversalRemote(RemoteEntity):
             return
         if not isinstance(command, list):
             command = [command]
-    
+        
         # Load the stored commands from the JSON file
         codes = await self._store.async_load() or {}
         device_codes = codes.get(device, {})
@@ -223,6 +222,39 @@ class UniversalRemote(RemoteEntity):
                     _LOGGER.debug("Sent '%s' to Tasmota MQTT topic %s", cmd, self._mqtt_topic)
                     if i < num_repeats - 1 and delay_secs:
                         await asyncio.sleep(delay_secs)
+
+    async def async_add_learned_buttons(self, device: str, command_names: list[str]) -> None:
+        """Add button entities for newly learned commands."""
+        from .button import RemoteCommandButton
+        
+        new_buttons = []
+        
+        # Load the stored commands
+        codes = await self._store.async_load() or {}
+        device_codes = codes.get(device, {})
+        
+        for cmd_name in command_names:
+            if cmd_name in device_codes:
+                button = RemoteCommandButton(
+                    hass=self.hass,
+                    remote_entity=self,
+                    device_name=device,
+                    command_name=cmd_name,
+                )
+                new_buttons.append(button)
+                button_id = f"{device}_{cmd_name}".replace(" ", "_").lower()
+                self._button_entities[button_id] = button
+                _LOGGER.info("Created button for %s:%s", device, cmd_name)
+        
+        if new_buttons:
+            try:
+                # Get the entity platform for buttons
+                entity_platform = self.hass.data.get("entity_components", {}).get(Platform.BUTTON)
+                if entity_platform:
+                    await entity_platform.async_add_entities(new_buttons)
+                    _LOGGER.info("Added %d new button entities", len(new_buttons))
+            except Exception as err:
+                _LOGGER.error("Error adding button entities: %s", err)
 
     async def async_learn_command(self, command=None, command_type="ir", device=None, timeout=None, **kwargs):
         """Learn one or more commands and save them under the specified device."""
@@ -366,6 +398,9 @@ class UniversalRemote(RemoteEntity):
         # Save all learned codes for this device
         codes[device] = device_codes
         await self._store.async_save(codes)
+        
+        # Add button entities for newly learned commands
+        await self.async_add_learned_buttons(device, command_names)
 
     async def async_turn_on(self, **kwargs):
         self._attr_is_on = True
