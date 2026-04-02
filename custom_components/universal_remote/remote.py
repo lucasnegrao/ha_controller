@@ -27,7 +27,6 @@ from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 from homeassistant.helpers.restore_state import RestoreEntity
 from homeassistant.util import dt as dt_util
 from homeassistant.core import callback
-from homeassistant.components.mqtt import async_subscribe
 from homeassistant.components import persistent_notification
 from datetime import timedelta
 
@@ -35,21 +34,14 @@ _LOGGER = logging.getLogger(__name__)
 
 DOMAIN = "universal_controller"
 
-CONF_BACKEND = "backend"
 CONF_DEVICE = "device"
-CONF_MQTT_TOPIC = "mqtt_topic"
 
 SUPPORT_UNIVERSAL_REMOTE = 1  # LEARN_COMMAND | SEND_COMMAND
 
 PLATFORM_SCHEMA = PLATFORM_SCHEMA.extend(
     {
         vol.Required(CONF_NAME): cv.string,
-        vol.Required(CONF_BACKEND): vol.In(["esphome", "tasmota"]),
-        vol.Optional(CONF_DEVICE): cv.string,
-        vol.Optional(CONF_MQTT_TOPIC): cv.string,
-        vol.Optional("led_entity_id"): cv.string,
-        vol.Optional("text_sensor_entity_id"): cv.string, 
-    }
+        vol.Required(CONF_DEVICE): cv.string,
 )
 
 LEARNING_TIMEOUT = timedelta(seconds=60)
@@ -90,35 +82,21 @@ async def async_setup_platform(hass, config, async_add_entities, discovery_info=
     name = config[CONF_NAME]
     backend = config[CONF_BACKEND]
     device = config.get(CONF_DEVICE)
-    mqtt_topic = config.get(CONF_MQTT_TOPIC)
-    led_entity_id = config.get("led_entity_id")
-    text_sensor_entity_id = config.get("text_sensor_entity_id")  
 
-    if backend == "esphome" and not device:
-        _LOGGER.error("device must be set when backend is esphome")
-        return
-    if backend == "tasmota" and not mqtt_topic:
-        _LOGGER.error("mqtt_topic must be set when backend is tasmota")
-        return
-
-    async_add_entities([UniversalRemote(hass, name, backend, device, mqtt_topic, led_entity_id, text_sensor_entity_id)])
+    async_add_entities([UniversalRemote(hass, name, device)])
 
 class UniversalRemote(RemoteEntity):
     """Universal Remote entity."""
 
-    def __init__(self, hass, name, backend, device, mqtt_topic, led_entity_id, text_sensor_entity_id=None):
+    def __init__(self, hass, name, device):
         self.hass = hass
         self._attr_name = name
-        self._backend = backend
         self._device = device
-        self._mqtt_topic = mqtt_topic
-        self._led_entity_id = led_entity_id
-        self._text_sensor_entity_id = text_sensor_entity_id  
         self._attr_is_on = True
         self._attr_supported_features = (
             RemoteEntityFeature.LEARN_COMMAND
         )
-        store_filename = f"universal_remote_LEARNED_codes_{device or mqtt_topic}.json"
+        store_filename = f"universal_controller_codes_{device}.json"
         self._store = Store(hass, 1, store_filename)
         self._button_entities = {}
 
@@ -147,7 +125,7 @@ class UniversalRemote(RemoteEntity):
             else:
                 commands_to_send.append(cmd)  # Assume it's already a raw code
 
-        if self._backend == "esphome":
+        if 0 == 0:
             num_repeats = kwargs.get("num_repeats", 1)
             delay_secs = kwargs.get("delay_secs", 0)
             hold_secs = kwargs.get("hold_secs", 0)
@@ -180,49 +158,7 @@ class UniversalRemote(RemoteEntity):
                     # Delay between repeats, except after the last one
                     if i < num_repeats - 1 and delay_secs:
                         await asyncio.sleep(delay_secs)
-        elif self._backend == "tasmota":
-            num_repeats = kwargs.get("num_repeats", 1)
-            delay_secs = kwargs.get("delay_secs", 0)
-            for cmd in commands_to_send:
-                for i in range(num_repeats):
-                    # If the command is a dict, use it directly; if string, try to parse as JSON, else wrap as IR
-                    if isinstance(cmd, dict):
-                        payload = cmd
-                        if (
-                            "RfSync" in payload
-                            or "RfCode" in payload
-                            or payload.get("Protocol", "").upper() == "RF"
-                        ):
-                            topic_cmd = "RfSend"
-                        else:
-                            topic_cmd = "IRSend"
-                    else:
-                        try:
-                            payload = json.loads(cmd)
-                            if (
-                                "RfSync" in payload
-                                or "RfCode" in payload
-                                or payload.get("Protocol", "").upper() == "RF"
-                            ):
-                                topic_cmd = "RfSend"
-                            else:
-                                topic_cmd = "IRSend"
-                        except (json.JSONDecodeError, TypeError):
-                            payload = {"Protocol": "IR", "Data": cmd}
-                            topic_cmd = "IRSend"
-                    await self.hass.services.async_call(
-                        "mqtt",
-                        "publish",
-                        {
-                            "topic": f"cmnd/{self._mqtt_topic}/{topic_cmd}",
-                            "payload": json.dumps(payload)
-                        },
-                        blocking=True,
-                    )
-                    _LOGGER.debug("Sent '%s' to Tasmota MQTT topic %s", cmd, self._mqtt_topic)
-                    if i < num_repeats - 1 and delay_secs:
-                        await asyncio.sleep(delay_secs)
-
+      
     async def async_add_learned_buttons(self, device: str, command_names: list[str]) -> None:
         """Add button entities for newly learned commands."""
         from .button import RemoteCommandButton
@@ -256,7 +192,7 @@ class UniversalRemote(RemoteEntity):
             except Exception as err:
                 _LOGGER.error("Error adding button entities: %s", err)
 
-    async def async_learn_command(self, command=None, command_type="ir", device=None, timeout=None, **kwargs):
+    async def async_learn_command(self, command, command_type, device, timeout=None, **kwargs):
         """Learn one or more commands and save them under the specified device."""
         if not device:
             _LOGGER.error("No device name provided for learning.")
@@ -289,7 +225,7 @@ class UniversalRemote(RemoteEntity):
 
             learned_code = None
 
-            if self._backend == "esphome":
+            if 0 == 0:
                 # Prepare to catch the next IR event
                 event_type = f"esphome.{self._device}_ir_received"
                 event_future = asyncio.get_running_loop().create_future()  # Ensure event_future is created properly
@@ -338,59 +274,6 @@ class UniversalRemote(RemoteEntity):
                         blocking=True,
                     )
                     persistent_notification.async_dismiss(self.hass, notification_id)
-
-            elif self._backend == "tasmota":
-                topic = f"tele/{self._mqtt_topic}/RESULT"
-                event_future = asyncio.Future()
-
-                @callback
-                def _mqtt_message_received(msg):
-                    payload = json.loads(msg.payload)
-                    code = None
-                    if command_type == "rf" and "RfReceived" in payload:
-                        code = payload["RfReceived"]
-                    elif command_type == "ir":
-                        if "IrReceived" in payload:
-                            code = payload["IrReceived"]
-                        elif "IrHVAC" in payload:
-                            code = payload["IrHVAC"]
-                    if code and not event_future.done():
-                        event_future.set_result(code)
-
-                unsub = await async_subscribe(self.hass, topic, _mqtt_message_received)
-
-                # Signal Tasmota LED (or other indicator) that learning has started
-                led_entity_id = getattr(self, "_led_entity_id", None)                
-                if led_entity_id:
-                    domain = led_entity_id.split(".")[0]                    
-                    await self.hass.services.async_call(
-                        domain, "turn_on", {"entity_id": led_entity_id}, blocking=True
-                    )
-
-                try:
-                    learned_code = await asyncio.wait_for(event_future, timeout=learning_timeout.total_seconds())
-                    _LOGGER.debug("Learned code from Tasmota: %s", learned_code)
-                except asyncio.TimeoutError:
-                    _LOGGER.error("Timeout waiting for Tasmota learned code MQTT message.")
-                    persistent_notification.async_create(
-                        self.hass,
-                        f"Timeout: No code received for '{cmd_name}' on '{device}'.",
-                        title="Learn command",
-                        notification_id=notification_id,
-                    )
-                    continue
-                finally:
-                    if unsub:
-                        if asyncio.iscoroutinefunction(unsub):
-                            await unsub()
-                        else:
-                            unsub()
-                    if led_entity_id:
-                        await self.hass.services.async_call(
-                            domain, "turn_off", {"entity_id": led_entity_id}, blocking=True
-                        )
-                    persistent_notification.async_dismiss(self.hass, notification_id)
-
             if learned_code:
                 device_codes[cmd_name] = learned_code
                 _LOGGER.info("Saved learned code for %s:%s", device, cmd_name)
