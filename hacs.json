@@ -1,9 +1,9 @@
 {
-  "name": "Universal Remote",
+  "name": "Universal Controller",
   "content_in_root": false,
-  "render_readme": true,  
-  "render_release_notes": true,  
-  "domains": ["universal_remote"],
+  "render_readme": false,  
+  "render_release_notes": false,  
+  "domains": ["universal_controller"],
   "homeassistant": "2025.6.3",
   "persistent_directory": "custom_components"  
 }
