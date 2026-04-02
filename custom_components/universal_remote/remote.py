@@ -9,6 +9,7 @@ from homeassistant.components.remote import (
     ATTR_COMMAND_TYPE,
     ATTR_DELAY_SECS,
     ATTR_DEVICE,
+    ATTR_TIMEOUT
     ATTR_NUM_REPEATS,
     DEFAULT_DELAY_SECS,
     SERVICE_DELETE_COMMAND,
@@ -70,7 +71,9 @@ SERVICE_LEARN_SCHEMA = COMMAND_SCHEMA.extend(
     {
         vol.Required(ATTR_DEVICE): vol.All(cv.string, vol.Length(min=1)),
         vol.Optional(ATTR_COMMAND_TYPE, default=COMMAND_TYPE_IR): vol.In(COMMAND_TYPES),
-        vol.Optional(ATTR_ALTERNATIVE, default=False): cv.boolean,
+        vol.Optional(ATTR_ALTERNATIVE, default=False): cv.boolean
+        vol.Optional(ATTR_TIMEOUT, default=LEARNING_TIMEOUT): cv.positive_int,
+
     }
 )
 
@@ -196,7 +199,7 @@ class UniversalRemote(RemoteEntity):
         command = kwargs.get(ATTR_COMMAND)
         device = kwargs.get(ATTR_DEVICE)
         command_type = kwargs.get(ATTR_COMMAND_TYPE)
-        timeout = kwargs.get(ATTR_COMMAND_TYPE)
+        timeout = kwargs.get(ATTR_TIMEOUT)
         
         """Learn one or more commands and save them under the specified device."""
         if not device:
