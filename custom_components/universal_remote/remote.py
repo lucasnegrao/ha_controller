@@ -33,7 +33,7 @@ from datetime import timedelta
 
 _LOGGER = logging.getLogger(__name__)
 
-DOMAIN = "universal_remote"
+DOMAIN = "universal_controller"
 
 CONF_BACKEND = "backend"
 CONF_DEVICE = "device"
