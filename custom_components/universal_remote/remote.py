@@ -9,7 +9,7 @@ from homeassistant.components.remote import (
     ATTR_COMMAND_TYPE,
     ATTR_DELAY_SECS,
     ATTR_DEVICE,
-    ATTR_TIMEOUT
+    ATTR_TIMEOUT,
     ATTR_NUM_REPEATS,
     DEFAULT_DELAY_SECS,
     SERVICE_DELETE_COMMAND,
