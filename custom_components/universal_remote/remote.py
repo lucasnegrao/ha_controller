@@ -192,7 +192,12 @@ class UniversalRemote(RemoteEntity):
             except Exception as err:
                 _LOGGER.error("Error adding button entities: %s", err)
 
-    async def async_learn_command(self, command, command_type, device, timeout=None, **kwargs):
+    async def async_learn_command(self, **kwargs):
+        command = kwargs.get(ATTR_COMMAND)
+        device = kwargs.get(ATTR_DEVICE)
+        command_type = kwargs.get(ATTR_COMMAND_TYPE)
+
+        
         """Learn one or more commands and save them under the specified device."""
         if not device:
             _LOGGER.error("No device name provided for learning.")
