@@ -70,7 +70,6 @@ SERVICE_SEND_SCHEMA = COMMAND_SCHEMA.extend(
 SERVICE_LEARN_SCHEMA = COMMAND_SCHEMA.extend(
     {
         vol.Required(ATTR_DEVICE): vol.All(cv.string, vol.Length(min=1)),
-        vol.Optional(ATTR_COMMAND_TYPE, default=COMMAND_TYPE_IR): vol.In(COMMAND_TYPES),
         vol.Optional(ATTR_ALTERNATIVE, default=False): cv.boolean,
         vol.Optional(ATTR_TIMEOUT, default=LEARNING_TIMEOUT): cv.positive_int,
 
