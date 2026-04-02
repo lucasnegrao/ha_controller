@@ -196,7 +196,7 @@ class UniversalRemote(RemoteEntity):
         command = kwargs.get(ATTR_COMMAND)
         device = kwargs.get(ATTR_DEVICE)
         command_type = kwargs.get(ATTR_COMMAND_TYPE)
-
+        timeout = kwargs.get(ATTR_COMMAND_TYPE)
         
         """Learn one or more commands and save them under the specified device."""
         if not device:
