@@ -7,7 +7,7 @@ from homeassistant.const import Platform
 
 _LOGGER = logging.getLogger(__name__)
 
-DOMAIN = "universal_remote"
+DOMAIN = "universal_controller"
 PLATFORMS = [Platform.REMOTE, Platform.BUTTON]
 
 
