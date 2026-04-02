@@ -42,17 +42,14 @@ class RemoteCommandButton(ButtonEntity):
         # Set friendly name
         self._attr_name = f"{device_name} {command_name}".title()
         
-        # Optional: Set device class if applicable
-        if any(keyword in command_name.lower() for keyword in ["power", "on", "off"]):
-            self._attr_device_class = ButtonDeviceClass.POWER
 
     @property
     def device_info(self):
         """Return device information."""
         return {
-            "identifiers": {("universal_remote", self._device_name)},
+            "identifiers": {("universal_controller", self._device_name)},
             "name": self._device_name,
-            "manufacturer": "Universal Remote",
+            "manufacturer": "Universal Controller",
             "model": "Learned Command",
         }
 
