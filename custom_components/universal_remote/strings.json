@@ -1,0 +1,31 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Setup Universal Controller",
+        "description": "Configure your universal Controller integration",
+        "data": {
+          "name": "Controller Name",
+          "device": "ESPHome Device Name",
+        },
+        "data_description": {
+          "device": "Required for ESPHome backend",
+        }
+      }
+    },
+    "error": {
+      "device_required_esphome": "Device name is required for ESPHome",
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Universal Controller Options",
+        "data": {
+          "auto_delete_buttons": "Auto-delete buttons when commands are removed",
+          "show_notifications": "Show notifications when learning commands"
+        }
+      }
+    }
+  }
+}
