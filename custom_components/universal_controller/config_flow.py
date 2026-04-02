@@ -1,4 +1,4 @@
-"""Config flow for Universal Remote integration."""
+"""Config flow for Universal controller integration."""
 
 import logging
 from typing import Any, Dict, Optional
@@ -10,14 +10,13 @@ from homeassistant.core import HomeAssistant
 from homeassistant.data_entry_flow import FlowResult
 import homeassistant.helpers.config_validation as cv
 
-from .remote import DOMAIN, CONF_DEVICE
+from .const import DOMAIN, CONF_REMOTE, CONF_AUTO_DELETE_BUTTONS, CONF_SHOW_NOTIFICATIONS, CONF_NAME
+
 
 _LOGGER = logging.getLogger(__name__)
 
-
-
-class UniversalRemoteConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
-    """Handle a config flow for Universal Remote."""
+class UniversalcontrollerConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
+    """Handle a config flow for Universal controller."""
 
     VERSION = 1
     CONNECTION_CLASS = config_entries.CONN_CLASS_LOCAL_POLL
@@ -38,7 +37,7 @@ class UniversalRemoteConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         schema = vol.Schema(
             {
                 vol.Required(CONF_NAME): cv.string,
-                vol.Required(CONF_DEVICE): cv.string,
+                vol.Required(CONF_REMOTE): cv.entity_id,
             }
         )
 
@@ -49,11 +48,11 @@ class UniversalRemoteConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     @staticmethod
     def async_get_options_flow(config_entry: config_entries.ConfigEntry):
         """Get the options flow for this config entry."""
-        return UniversalRemoteOptionsFlow(config_entry)
+        return UniversalcontrollerOptionsFlow(config_entry)
 
 
-class UniversalRemoteOptionsFlow(config_entries.OptionsFlow):
-    """Handle options for Universal Remote."""
+class UniversalcontrollerOptionsFlow(config_entries.OptionsFlow):
+    """Handle options for Universal controller."""
 
     def __init__(self, config_entry: config_entries.ConfigEntry) -> None:
         """Initialize options flow."""
@@ -68,12 +67,12 @@ class UniversalRemoteOptionsFlow(config_entries.OptionsFlow):
         schema = vol.Schema(
             {
                 vol.Optional(
-                    "auto_delete_buttons",
-                    default=options.get("auto_delete_buttons", True)
+                    CONF_AUTO_DELETE_BUTTONS,
+                    default=options.get(CONF_AUTO_DELETE_BUTTONS, True)
                 ): cv.boolean,
                 vol.Optional(
-                    "show_notifications",
-                    default=options.get("show_notifications", True)
+                    CONF_SHOW_NOTIFICATIONS,
+                    default=options.get(CONF_SHOW_NOTIFICATIONS, True)
                 ): cv.boolean,
             }
         )

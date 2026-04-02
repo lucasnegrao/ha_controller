@@ -6,6 +6,6 @@
   "requirements": [],
   "dependencies": ["remote","button"],
   "codeowners": ["@lucasnegrao"],
-  "integration_type": "platform",
+  "integration_type": "hub",
   "config_flow": true
 }

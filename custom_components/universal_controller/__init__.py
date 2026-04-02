@@ -1,4 +1,4 @@
-"""Universal Remote integration."""
+"""Universal controller integration."""
 
 import logging
 from homeassistant.core import HomeAssistant, callback
@@ -21,10 +21,10 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
 async def async_setup_entry(
     hass: HomeAssistant, entry: ConfigEntry
 ) -> bool:
-    """Set up Universal Remote from a config entry."""
+    """Set up Universal controller from a config entry."""
     hass.data.setdefault(DOMAIN, {})[entry.entry_id] = {
         "buttons": {},  # Track button entities per entry
-        "remote_entity": None,  # Reference to remote entity
+        "controller_entity": None,  # Referencecontrollermote entity
     }
     
     # Listen for config update

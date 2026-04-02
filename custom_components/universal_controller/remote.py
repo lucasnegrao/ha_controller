@@ -1,4 +1,4 @@
-"""Platform for Universal Remote integration."""
+"""Platform for Universal controller integration."""
 import logging
 import voluptuous as vol
 import asyncio
@@ -8,7 +8,7 @@ from homeassistant.components.remote import (
     ATTR_ALTERNATIVE,
     ATTR_COMMAND_TYPE,
     ATTR_DELAY_SECS,
-    ATTR_DEVICE,
+    ATTR_remote,
     ATTR_NUM_REPEATS,
     ATTR_TIMEOUT,
     DEFAULT_DELAY_SECS,
@@ -18,6 +18,7 @@ from homeassistant.components.remote import (
     RemoteEntity,
     RemoteEntityFeature,
     PLATFORM_SCHEMA,
+    LEARN_COMMAND
 )
 
 from homeassistant.const import CONF_NAME, ATTR_COMMAND, STATE_OFF, Platform
@@ -31,18 +32,19 @@ from homeassistant.core import callback
 from homeassistant.components import persistent_notification
 from datetime import timedelta
 
+from . import HubConfigEntry
+from .const import DOMAIN
+from .button import async_add_button, remove_persisted_button
+
 _LOGGER = logging.getLogger(__name__)
 
-DOMAIN = "universal_controller"
+CONF_REMOTE = "remote"
 
-CONF_DEVICE = "device"
-
-SUPPORT_UNIVERSAL_REMOTE = 1  # LEARN_COMMAND | SEND_COMMAND
+SUPPORT_UNIVERSAL_REMOTE = LEARN_COMMAND
 
 PLATFORM_SCHEMA = PLATFORM_SCHEMA.extend(
     {
-        vol.Required(CONF_NAME): cv.string,
-        vol.Required(CONF_DEVICE): cv.string
+        vol.Required(CONF_REMOTE): cv.entity_id,
     }
 )
 
@@ -50,7 +52,8 @@ LEARNING_TIMEOUT = timedelta(seconds=60)
 
 COMMAND_TYPE_IR = "ir"
 COMMAND_TYPE_RF = "rf"
-COMMAND_TYPES = [COMMAND_TYPE_IR, COMMAND_TYPE_RF]
+
+COMMAND_TYPES = [COMMAND_TYPE_IR] # we only support ir now
 
 COMMAND_SCHEMA = vol.Schema(
     {
@@ -69,77 +72,63 @@ SERVICE_SEND_SCHEMA = COMMAND_SCHEMA.extend(
 
 SERVICE_LEARN_SCHEMA = COMMAND_SCHEMA.extend(
     {
-        vol.Required(ATTR_DEVICE): vol.All(cv.string, vol.Length(min=1)),
+        vol.Required(ATTR_remote): vol.All(cv.string, vol.Length(min=1)),
         vol.Optional(ATTR_ALTERNATIVE, default=False): cv.boolean,
         vol.Optional(ATTR_TIMEOUT, default=LEARNING_TIMEOUT): cv.positive_int,
-
     }
 )
 
 SERVICE_DELETE_SCHEMA = COMMAND_SCHEMA.extend(
-    {vol.Required(ATTR_DEVICE): vol.All(cv.string, vol.Length(min=1))}
+    {vol.Required(ATTR_remote): vol.All(cv.string, vol.Length(min=1))}
 )
-
-async def async_setup_platform(hass, config, async_add_entities, discovery_info=None):
-    """Set up the Universal Remote platform."""
-    name = config[CONF_NAME]
-    device = config.get(CONF_DEVICE)
-
-    async_add_entities([UniversalRemote(hass, name, device)])
 
 async def async_setup_entry(
     hass: HomeAssistant,
-    entry: ConfigEntry,
+    config_entry: HubConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
-    """Set up the remote from a config entry."""
-    name = entry.data.get(CONF_NAME)
-    device = entry.data.get(CONF_DEVICE)
-
-    remote = UniversalRemote(
-        hass,
-        name,
-        device,
-        entry_id=entry.entry_id,
-    )
     
-    # Store reference in hass.data
-    hass.data[DOMAIN][entry.entry_id]["remote_entity"] = remote
-    
-    async_add_entities([remote])
-    
-    # Load persisted buttons
-    await remote.async_load_persisted_buttons()
+    hub = config_entry.runtime_data
+    new_devices = []
+    new_devices += [UniversalControllerRemoteEntity(remote, hub) for remote in hub.remotes]
+    async_add_entities(new_devices)
+    hub.remotes += new_devices
 
+class UniversalControllerRemoteEntity(RemoteEntity):
+    """Universal Controller Remote entity."""
 
-class UniversalRemote(RemoteEntity):
-    """Universal Remote entity."""
-
-    def __init__(self, hass, name, device, entry_id: str = None):
-        self.hass = hass
-        self._attr_name = name
-        self._device = device
+    def __init__(self, remote, hub):
+        self._config_entry = hub.config_entry
+        self._remote = remote
         self._attr_is_on = True
         self._attr_supported_features = (
             RemoteEntityFeature.LEARN_COMMAND
         )
-        self._entry_id = entry_id
-        store_filename = f"universal_controller_codes_{device}.json"
-        self._store = Store(hass, 1, store_filename)
-        
-        buttons_filename = f"universal_remote_BUTTONS_{device or mqtt_topic}.json"
-        self._buttons_store = Store(hass, 1, buttons_filename)
-        
-        self._button_entities = {}
+        self._attr_unique_id = f"{self._controller.controller_id}_remote"
+        store_filename = f"universalcontroller_remote_codes_{remote}.json"
+        self._store = Store(hub.hass, 1, store_filename)
+    
+    
+    async def async_added_to_hass(self) -> None:
+        """Run when this Entity has been added to HA."""
+        self._remote.register_callback(self.async_write_ha_state)
+
+    @property
+    def device_info(self):
+        """Information about this entity/device."""
+        return {
+            "identifiers": {(DOMAIN, self._remote.remote_id)},
+            # If desired, the name for the device could be different to the entity
+            "name": self._config_entry.name,
+            "sw_version": self._remote.firmware_version,
+            "model": self._remote.model,
+            "manufacturer": self._remote.hub.manufacturer,
+        }
 
     @property
     def available(self):
         return True
 
-    @property
-    def available(self):
-        # You can implement actual state checks here
-        return True
 
     async def async_send_command(self, command, device=None, **kwargs):
         """Send a command by name or raw code."""
@@ -182,11 +171,11 @@ class UniversalRemote(RemoteEntity):
                     # Call the ESPHome service with the list of integers
                     await self.hass.services.async_call(
                         "esphome",
-                        f"{self._device}_send",
+                        f"{self._remote}_send",
                         {"command": cmd},
                         blocking=True,
                     )
-                    _LOGGER.debug("Sent raw command '%s' to ESPHome device %s", cmd, self._device)
+                    _LOGGER.debug("Sent raw command '%s' to ESPHome device %s", cmd, self._remote)
                     # Hold the button if requested (simulate long press)
                     if hold_secs and hold_secs > 0:
                         await asyncio.sleep(hold_secs)
@@ -195,79 +184,9 @@ class UniversalRemote(RemoteEntity):
                     if i < num_repeats - 1 and delay_secs:
                         await asyncio.sleep(delay_secs)
     
-    async def async_load_persisted_buttons(self) -> None:
-        """Load persisted buttons from storage and recreate them."""
-        from .button import RemoteCommandButton
-        
-        try:
-            persisted = await self._buttons_store.async_load() or {}
-            
-            for device, commands in persisted.items():
-                await self.async_add_learned_buttons(device, list(commands.keys()), persist=False)
-            
-            _LOGGER.info("Loaded %d persisted buttons", sum(len(cmds) for cmds in persisted.values()))
-        except Exception as err:
-            _LOGGER.error("Error loading persisted buttons: %s", err)
-            
-    async def async_add_learned_buttons(
-        self, device: str, command_names: list, persist: bool = True
-    ) -> None:
-        """Add button entities for newly learned commands."""
-        from .button import RemoteCommandButton
-        
-        new_buttons = []
-        
-        # Load the stored commands
-        codes = await self._store.async_load() or {}
-        device_codes = codes.get(device, {})
-        
-        for cmd_name in command_names:
-            if cmd_name in device_codes:
-                button = RemoteCommandButton(
-                    hass=self.hass,
-                    remote_entity=self,
-                    device_name=device,
-                    command_name=cmd_name,
-                )
-                new_buttons.append(button)
-                button_id = f"{device}_{cmd_name}".replace(" ", "_").lower()
-                self._button_entities[button_id] = button
-                _LOGGER.info("Created button for %s:%s", device, cmd_name)
-        
-        if new_buttons:
-            try:
-                # Get the entity platform for buttons
-                entity_platform = self.hass.data.get("entity_components", {}).get(Platform.BUTTON)
-                if entity_platform:
-                    await entity_platform.async_add_entities(new_buttons)
-                    _LOGGER.info("Added %d new button entities", len(new_buttons))
-                    
-                    # Persist buttons to storage
-                    if persist:
-                        await self.async_persist_buttons(device, command_names)
-            except Exception as err:
-                _LOGGER.error("Error adding button entities: %s", err)
-
-    async def async_persist_buttons(self, device: str, command_names: list) -> None:
-        """Save button information for persistence across restarts."""
-        try:
-            persisted = await self._buttons_store.async_load() or {}
-            if device not in persisted:
-                persisted[device] = {}
-            
-            for cmd_name in command_names:
-                persisted[device][cmd_name] = True
-            
-            await self._buttons_store.async_save(persisted)
-            _LOGGER.debug("Persisted buttons for %s", device)
-        except Exception as err:
-            _LOGGER.error("Error persisting buttons: %s", err)
-
-
-
     async def async_learn_command(self, **kwargs):
         command = kwargs.get(ATTR_COMMAND)
-        device = kwargs.get(ATTR_DEVICE)
+        device = kwargs.get(ATTR_remote)
         command_type = kwargs.get(ATTR_COMMAND_TYPE)
         timeout = kwargs.get(ATTR_TIMEOUT)
         
@@ -288,7 +207,7 @@ class UniversalRemote(RemoteEntity):
         # Use custom timeout if provided
         learning_timeout = timedelta(seconds=timeout) if timeout else LEARNING_TIMEOUT
 
-        # Load or create the storage file for this remote
+        # Load or create the storage file for this controller
         codes = await self._store.async_load() or {}
         device_codes = codes.get(device, {})
 
@@ -305,7 +224,7 @@ class UniversalRemote(RemoteEntity):
 
             if 0 == 0:
                 # Prepare to catch the next IR event
-                event_type = f"esphome.{self._device}_ir_received"
+                event_type = f"esphome.{self._remote}_ir_received"
                 event_future = asyncio.get_running_loop().create_future()  # Ensure event_future is created properly
 
                 @callback
@@ -321,10 +240,10 @@ class UniversalRemote(RemoteEntity):
 
                     # Signal ESPHome that learning has started
                     await self.hass.services.async_call(
-                        "esphome", f"{self._device}_learning_started", {}, blocking=True
+                        "esphome", f"{self._remote}_learning_started", {}, blocking=True
                     )
                     await self.hass.services.async_call(
-                        "esphome", f"{self._device}_learn", {"command_type": command_type}, blocking=True
+                        "esphome", f"{self._remote}_learn", {"command_type": command_type}, blocking=True
                     )
 
                     # Wait for the event to be set
@@ -347,10 +266,10 @@ class UniversalRemote(RemoteEntity):
                         remove_listener()
                     await self.hass.services.async_call(
                         "esphome",
-                        f"{self._device}_learning_ended",
+                        f"{self._remote}_learning_ended",
                         {},
                         blocking=True,
-                    )
+                    ),
                     persistent_notification.async_dismiss(self.hass, notification_id)
             if learned_code:
                 device_codes[cmd_name] = learned_code
@@ -361,7 +280,8 @@ class UniversalRemote(RemoteEntity):
         await self._store.async_save(codes)
         
         # Add button entities for newly learned commands
-        await self.async_add_learned_buttons(device, command_names)
+        for cmd_name in command_names:
+            await async_add_button(self, device, cmd_name, True)
 
     async def async_turn_on(self, **kwargs):
         self._attr_is_on = True
@@ -372,6 +292,7 @@ class UniversalRemote(RemoteEntity):
     async def async_update(self):
         # Optionally implement: update state from device
         pass
+    
 
     async def async_delete_command(self, command=None, device=None, **kwargs):
         """Delete one or more commands from the storage."""
@@ -404,23 +325,10 @@ class UniversalRemote(RemoteEntity):
                     del self._button_entities[button_id]
                 
                 # Remove from persisted buttons
-                await self._remove_persisted_button(device, cmd_name)
+                await remove_persisted_button(hass, self, device, cmd_name)
             else:
                 _LOGGER.warning("Command '%s' not found for device '%s'", cmd_name, device)
 
         # Save the updated codes back to storage
         codes[device] = device_codes
         await self._store.async_save(codes)
-
-    async def _remove_persisted_button(self, device: str, cmd_name: str) -> None:
-        """Remove a button from persistent storage."""
-        try:
-            persisted = await self._buttons_store.async_load() or {}
-            if device in persisted and cmd_name in persisted[device]:
-                del persisted[device][cmd_name]
-                if not persisted[device]:
-                    del persisted[device]
-                await self._buttons_store.async_save(persisted)
-                _LOGGER.debug("Removed persisted button for %s:%s", device, cmd_name)
-        except Exception as err:
-            _LOGGER.error("Error removing persisted button: %s", err)

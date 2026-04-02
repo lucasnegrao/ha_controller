@@ -1,4 +1,4 @@
-"""Services for Universal Remote."""
+"""Services for Universal controller."""
 
 import logging
 from homeassistant.core import HomeAssistant, ServiceCall
@@ -14,17 +14,17 @@ SERVICE_MANAGE_BUTTONS = "manage_buttons"
 
 
 async def async_setup_services(hass: HomeAssistant) -> None:
-    """Set up services for Universal Remote."""
+    """Set up services for Universal controller."""
 
     async def handle_learn_command(call: ServiceCall) -> None:
         """Handle learn command service call."""
-        remote_entity = call.data.get("remote_entity")
+        controller_entity = call.data.gcontrollermote_entity")
         device = call.data.get("device")
         command = call.data.get("command")
         command_type = call.data.get("command_type", "ir")
         
-        if remote_entity:
-            await remote_entity.async_learn_command(
+        if controller_entity:
+            await controller_entity.async_learn_command(
                 command=command,
                 command_type=command_type,
                 device=device,
@@ -32,12 +32,12 @@ async def async_setup_services(hass: HomeAssistant) -> None:
 
     async def handle_delete_command(call: ServiceCall) -> None:
         """Handle delete command service call."""
-        remote_entity = call.data.get("remote_entity")
+        controller_entity = call.data.gcontrollermote_entity")
         device = call.data.get("device")
         command = call.data.get("command")
         
-        if remote_entity:
-            await remote_entity.async_delete_command(
+        if controller_entity:
+            await controller_entity.async_delete_command(
                 command=command,
                 device=device,
             )
