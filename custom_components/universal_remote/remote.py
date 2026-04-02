@@ -81,7 +81,6 @@ SERVICE_DELETE_SCHEMA = COMMAND_SCHEMA.extend(
 async def async_setup_platform(hass, config, async_add_entities, discovery_info=None):
     """Set up the Universal Remote platform."""
     name = config[CONF_NAME]
-    backend = config[CONF_BACKEND]
     device = config.get(CONF_DEVICE)
 
     async_add_entities([UniversalRemote(hass, name, device)])
